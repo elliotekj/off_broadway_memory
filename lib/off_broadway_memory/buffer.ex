@@ -21,32 +21,32 @@ defmodule OffBroadwayMemory.Buffer do
   Push messages to the buffer.
   """
   @spec push(GenServer.server(), list(any()) | any()) :: :ok
-  def push(pid, messages) do
-    GenServer.call(pid, {:push, messages})
+  def push(server, messages) do
+    GenServer.call(server, {:push, messages})
   end
 
   @doc """
   Pop messages from the buffer.
   """
   @spec pop(GenServer.server(), non_neg_integer()) :: list(any())
-  def pop(pid, count \\ 1) do
-    GenServer.call(pid, {:pop, count})
+  def pop(server, count \\ 1) do
+    GenServer.call(server, {:pop, count})
   end
 
   @doc """
   Clear all messages from the buffer.
   """
   @spec clear(GenServer.server()) :: :ok
-  def clear(pid) do
-    GenServer.call(pid, :clear)
+  def clear(server) do
+    GenServer.call(server, :clear)
   end
 
   @doc """
   Get the length of the buffer.
   """
   @spec length(GenServer.server()) :: non_neg_integer()
-  def length(pid) do
-    GenServer.call(pid, :length)
+  def length(server) do
+    GenServer.call(server, :length)
   end
 
   @impl true
