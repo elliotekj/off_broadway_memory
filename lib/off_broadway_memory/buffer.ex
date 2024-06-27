@@ -5,6 +5,8 @@ defmodule OffBroadwayMemory.Buffer do
 
   use GenServer
 
+  @initial_state %{queue: :queue.new(), length: 0}
+
   @doc false
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts)
@@ -12,7 +14,7 @@ defmodule OffBroadwayMemory.Buffer do
 
   @impl true
   def init(_opts) do
-    {:ok, %{queue: :queue.new()}}
+    {:ok, @initial_state}
   end
 
   @doc """
@@ -49,40 +51,44 @@ defmodule OffBroadwayMemory.Buffer do
 
   @impl true
   def handle_call({:push, messages}, _from, state) when is_list(messages) do
+    messages_length = Kernel.length(messages)
+
     join = :queue.from_list(messages)
-    queue = :queue.join(state.queue, join)
-    {:reply, :ok, %{state | queue: queue}}
+    updated_queue = :queue.join(state.queue, join)
+
+    {:reply, :ok, %{queue: updated_queue, length: state.length + messages_length}}
   end
 
   def handle_call({:push, message}, _from, state) do
-    join = :queue.from_list([message])
-    queue = :queue.join(state.queue, join)
-    {:reply, :ok, %{state | queue: queue}}
+    updated_queue = :queue.in(message, state.queue)
+
+    {:reply, :ok, %{queue: updated_queue, length: state.length + 1}}
+  end
+
+  def handle_call({:pop, _count}, _from, %{length: 0} = state) do
+    {:reply, [], state}
+  end
+
+  def handle_call({:pop, count}, _from, %{length: length} = state) when count >= length do
+    {:reply, :queue.to_list(state.queue), @initial_state}
   end
 
   def handle_call({:pop, count}, _from, state) do
-    {messages, new_queue} =
-      case :queue.len(state.queue) do
-        len when len == 0 ->
-          {[], state.queue}
+    {messages, updated_queue} = :queue.split(count, state.queue)
 
-        len when len - count <= 0 ->
-          {:queue.to_list(state.queue), :queue.new()}
+    updated_state = %{
+      queue: updated_queue,
+      length: state.length - count
+    }
 
-        _len ->
-          {messages, queue} = :queue.split(count, state.queue)
-          {:queue.to_list(messages), queue}
-      end
-
-    {:reply, messages, %{state | queue: new_queue}}
+    {:reply, :queue.to_list(messages), updated_state}
   end
 
-  def handle_call(:clear, _from, state) do
-    {:reply, :ok, %{state | queue: :queue.new()}}
+  def handle_call(:clear, _from, _state) do
+    {:reply, :ok, @initial_state}
   end
 
-  def handle_call(:length, _from, state) do
-    length = :queue.len(state.queue)
+  def handle_call(:length, _from, %{length: length} = state) do
     {:reply, length, state}
   end
 end
