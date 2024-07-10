@@ -8,6 +8,14 @@ defmodule OffBroadwayMemory.BufferTest do
     {:ok, %{buffer_pid: pid}}
   end
 
+  describe "start_link/1" do
+    test "uses options" do
+      Buffer.start_link(name: :buffer)
+      assert :ok == Buffer.push(:buffer, "test")
+      assert ["test"] == Buffer.pop(:buffer)
+    end
+  end
+
   describe "push/2" do
     test "pushes a message", %{buffer_pid: buffer_pid} do
       assert :ok == Buffer.push(buffer_pid, "test")
