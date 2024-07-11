@@ -9,7 +9,7 @@ defmodule OffBroadwayMemory.Buffer do
 
   @doc false
   def start_link(opts \\ []) do
-    GenServer.start_link(__MODULE__, opts)
+    GenServer.start_link(__MODULE__, nil, opts)
   end
 
   @impl true
