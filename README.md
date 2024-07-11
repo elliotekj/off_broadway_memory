@@ -10,7 +10,7 @@ dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:off_broadway_memory, "~> 1.0"}
+    {:off_broadway_memory, "~> 1.1"}
   ]
 end
 ```
