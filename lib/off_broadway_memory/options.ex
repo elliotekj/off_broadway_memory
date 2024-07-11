@@ -3,9 +3,9 @@ defmodule OffBroadwayMemory.Options do
 
   def definition do
     [
-      buffer_pid: [
-        required: true,
-        type: :pid,
+      buffer: [
+        # TODO Require this once we drop support for `:buffer_pid`
+        type: {:or, [:pid, :atom]},
         doc: """
         The buffer responsible for storing the queued messages.
         """
@@ -32,6 +32,13 @@ defmodule OffBroadwayMemory.Options do
       broadway: [
         required: true,
         doc: false
+      ],
+      buffer_pid: [
+        type: :pid,
+        deprecated: "Renamed to `buffer` in v1.1.0.",
+        doc: """
+        The buffer responsible for storing the queued messages.
+        """
       ]
     ]
   end

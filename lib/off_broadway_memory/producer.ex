@@ -10,20 +10,20 @@ defmodule OffBroadwayMemory.Producer do
 
   ```
   # Start a buffer:
-  {:ok, buffer_pid} = OffBroadwayMemory.Buffer.start_link()
+  OffBroadwayMemory.Buffer.start_link(name: :example_buffer)
 
   # Connect it to Broadway:
   Broadway.start_link(MyBroadway,
     name: MyBroadway,
     producer: [
-      module: {OffBroadwayMemory.Producer, buffer_pid: buffer_pid},
+      module: {OffBroadwayMemory.Producer, buffer: :example_buffer},
       concurrency: 1
     ],
-    processors: [default: [concurrency: 50]],
+    processors: [default: [concurrency: 50]]
   )
 
   # Push data to be processed:
-  OffBroadwayMemory.Buffer.push(buffer_pid, ["example", "data", "set"])
+  OffBroadwayMemory.Buffer.push(:example_buffer, ["example", "data", "set"])
   ```
 
   ## Telemetry
@@ -93,14 +93,20 @@ defmodule OffBroadwayMemory.Producer do
     case NimbleOptions.validate(opts, Options.definition()) do
       {:ok, opts} ->
         ack_ref = opts[:broadway][:name]
-        buffer_pid = opts[:buffer_pid]
+        buffer = opts[:buffer] || opts[:buffer_pid]
+
+        if buffer == nil do
+          raise ArgumentError,
+                "invalid configuration given to OffBroadwayMemory.Producer.init/1, required :buffer option not found, received options: #{inspect(opts)}"
+        end
+
         resolve_pending_timeout = opts[:resolve_pending_timeout]
         on_failure = opts[:on_failure]
 
-        :persistent_term.put(ack_ref, %{buffer_pid: buffer_pid, on_failure: on_failure})
+        :persistent_term.put(ack_ref, %{buffer: buffer, on_failure: on_failure})
 
         state = %{
-          buffer_pid: buffer_pid,
+          buffer: buffer,
           ack_ref: ack_ref,
           demand: 0,
           resolve_pending_timeout: resolve_pending_timeout
@@ -125,7 +131,7 @@ defmodule OffBroadwayMemory.Producer do
       |> Enum.filter(&ack?(&1, requeue?))
       |> Enum.map(& &1.data)
 
-    Buffer.push(ack_options.buffer_pid, requeue)
+    Buffer.push(ack_options.buffer, requeue)
 
     :ok
   end
@@ -154,7 +160,7 @@ defmodule OffBroadwayMemory.Producer do
 
     items =
       :telemetry.span([:off_broadway_memory, :receive_messages], metadata, fn ->
-        messages = Buffer.pop(state.buffer_pid, demand) |> transform_messages(state.ack_ref)
+        messages = Buffer.pop(state.buffer, demand) |> transform_messages(state.ack_ref)
         {messages, Map.put(metadata, :messages, messages)}
       end)
 

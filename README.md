@@ -10,7 +10,7 @@ dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:off_broadway_memory, "~> 1.0"}
+    {:off_broadway_memory, "~> 1.1"}
   ]
 end
 ```
@@ -20,7 +20,7 @@ end
 Start a buffer:
 
 ```elixir
-{:ok, buffer_pid} = OffBroadwayMemory.Buffer.start_link()
+OffBroadwayMemory.Buffer.start_link(name: :example_buffer)
 ```
 
 Connect it to Broadway:
@@ -29,17 +29,17 @@ Connect it to Broadway:
 Broadway.start_link(MyBroadway,
   name: MyBroadway,
   producer: [
-    module: {OffBroadwayMemory.Producer, buffer_pid: buffer_pid},
+    module: {OffBroadwayMemory.Producer, buffer: :example_buffer},
     concurrency: 1
   ],
-  processors: [default: [concurrency: 50]],
+  processors: [default: [concurrency: 50]]
 )
 ```
 
 Push data to be processed:
 
 ```elixir
-OffBroadwayMemory.Buffer.push(buffer_pid, ["example", "data", "set"])
+OffBroadwayMemory.Buffer.push(:example_buffer, ["example", "data", "set"])
 ```
 
 ## License
