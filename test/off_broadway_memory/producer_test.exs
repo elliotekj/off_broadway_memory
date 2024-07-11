@@ -5,21 +5,21 @@ defmodule OffBroadwayMemory.ProducerTest do
   alias OffBroadwayMemory.Buffer
   import ExUnit.CaptureLog
 
-  # doctest OffBroadwayMemory
-
   describe "init/1 validation" do
-    test "requires a buffer pid" do
-      {:error, error} = start_supervised({Producer, []}, restart: :temporary)
+    test "requires a buffer" do
+      {:error, error} =
+        start_supervised({Producer, [broadway: %{name: :test}]}, restart: :temporary)
+
       argument_error = error |> elem(0) |> elem(0)
 
       assert argument_error == %ArgumentError{
                message:
-                 "invalid configuration given to OffBroadwayMemory.Producer.init/1, required :buffer_pid option not found, received options: []"
+                 "invalid configuration given to OffBroadwayMemory.Producer.init/1, required :buffer option not found, received options: [on_failure: :requeue, resolve_pending_timeout: 100, broadway: %{name: :test}]"
              }
     end
   end
 
-  test "receives messages when the queue has less than the demand" do
+  test "receives messages with deprecated :buffer_pid option" do
     {:ok, buffer_pid} = Buffer.start_link()
     {:ok, broadway_pid} = start_broadway(buffer_pid: buffer_pid, resolve_pending_timeout: 50)
 
@@ -32,9 +32,35 @@ defmodule OffBroadwayMemory.ProducerTest do
     stop_broadway(broadway_pid)
   end
 
+  test "receives messages from a named buffer" do
+    Buffer.start_link(name: :test_buffer)
+    {:ok, broadway_pid} = start_broadway(buffer: :test_buffer, resolve_pending_timeout: 50)
+
+    deliver_messages(:test_buffer, 1..2)
+
+    assert_receive {:handle_message, 1}
+    assert_receive {:handle_message, 2}
+    assert_receive {:handle_batch, [1, 2]}
+
+    stop_broadway(broadway_pid)
+  end
+
+  test "receives messages when the queue has less than the demand" do
+    {:ok, buffer_pid} = Buffer.start_link()
+    {:ok, broadway_pid} = start_broadway(buffer: buffer_pid, resolve_pending_timeout: 50)
+
+    deliver_messages(buffer_pid, 1..2)
+
+    assert_receive {:handle_message, 1}
+    assert_receive {:handle_message, 2}
+    assert_receive {:handle_batch, [1, 2]}
+
+    stop_broadway(broadway_pid)
+  end
+
   test "continues receiving messages when the queue has more than the demand" do
     {:ok, buffer_pid} = Buffer.start_link()
-    {:ok, broadway_pid} = start_broadway(buffer_pid: buffer_pid, resolve_pending_timeout: 50)
+    {:ok, broadway_pid} = start_broadway(buffer: buffer_pid, resolve_pending_timeout: 50)
 
     deliver_messages(buffer_pid, 1..20)
 
@@ -57,7 +83,7 @@ defmodule OffBroadwayMemory.ProducerTest do
 
   test "continues trying to receive messages when the queue is empty" do
     {:ok, buffer_pid} = Buffer.start_link()
-    {:ok, broadway_pid} = start_broadway(buffer_pid: buffer_pid, resolve_pending_timeout: 50)
+    {:ok, broadway_pid} = start_broadway(buffer: buffer_pid, resolve_pending_timeout: 50)
 
     deliver_messages(buffer_pid, 1..2)
 
@@ -79,7 +105,7 @@ defmodule OffBroadwayMemory.ProducerTest do
   test "emits a telemetry start event with demand" do
     self = self()
     {:ok, buffer_pid} = Buffer.start_link()
-    {:ok, broadway_pid} = start_broadway(buffer_pid: buffer_pid, resolve_pending_timeout: 50)
+    {:ok, broadway_pid} = start_broadway(buffer: buffer_pid, resolve_pending_timeout: 50)
 
     capture_log(fn ->
       :ok =
@@ -104,7 +130,7 @@ defmodule OffBroadwayMemory.ProducerTest do
   test "emits a telemetry stop event with messages" do
     self = self()
     {:ok, buffer_pid} = Buffer.start_link()
-    {:ok, broadway_pid} = start_broadway(buffer_pid: buffer_pid, resolve_pending_timeout: 50)
+    {:ok, broadway_pid} = start_broadway(buffer: buffer_pid, resolve_pending_timeout: 50)
 
     capture_log(fn ->
       :ok =
