@@ -192,7 +192,7 @@ defmodule OffBroadwayMemory.Producer do
 
     case message_ack_options[:on_failure] do
       nil -> default
-      ack? -> ack?
+      ack? -> ack? == :requeue
     end
   end
 end
