@@ -128,8 +128,8 @@ defmodule OffBroadwayMemory.Producer do
 
     requeue =
       failed
-      |> Enum.filter(&ack?(&1, requeue?))
-      |> Enum.map(& &1.data)
+      |> Enum.reject(&ack?(&1, requeue?))
+      |> Enum.map(&get_initial_data(&1))
 
     Buffer.push(ack_options.buffer, requeue)
 
@@ -174,8 +174,13 @@ defmodule OffBroadwayMemory.Producer do
   defp transform_message(message, ack_ref) do
     %Broadway.Message{
       data: message,
-      acknowledger: {__MODULE__, ack_ref, %{}}
+      acknowledger: {__MODULE__, ack_ref, %{initial_data: message}}
     }
+  end
+
+  defp get_initial_data(message) do
+    {_, _, %{initial_data: initial_data}} = message.acknowledger
+    initial_data
   end
 
   defp format_error(%ValidationError{keys_path: [], message: message}) do
@@ -187,12 +192,15 @@ defmodule OffBroadwayMemory.Producer do
       message
   end
 
-  defp ack?(%Broadway.Message{} = message, default) do
+  defp ack?(%Broadway.Message{} = message, requeue_default) do
     {_, _, message_ack_options} = message.acknowledger
+    on_failure = message_ack_options[:on_failure]
 
-    case message_ack_options[:on_failure] do
-      nil -> default
-      ack? -> ack?
+    cond do
+      on_failure == :requeue -> false
+      on_failure != nil -> true
+      requeue_default == true -> false
+      true -> true
     end
   end
 end
