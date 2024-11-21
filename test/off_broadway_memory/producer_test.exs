@@ -5,6 +5,46 @@ defmodule OffBroadwayMemory.ProducerTest do
   alias OffBroadwayMemory.Buffer
   import ExUnit.CaptureLog
 
+  defmodule Forwarder do
+    @moduledoc false
+    use Broadway
+
+    def handle_message(_, message, %{test_pid: test_pid}) do
+      send(test_pid, {:handle_message, message.data})
+      message
+    end
+
+    def handle_batch(_, messages, _, %{test_pid: test_pid}) do
+      send(test_pid, {:handle_batch, Enum.map(messages, & &1.data)})
+      messages
+    end
+  end
+
+  defmodule BuggyForwarder do
+    @moduledoc false
+    use Broadway
+
+    def handle_message(_, message, %{test_pid: test_pid}) do
+      pid_string = inspect(test_pid)
+
+      if :persistent_term.get(pid_string, false) do
+        send(test_pid, {:handle_message, message.data})
+        message
+      else
+        :persistent_term.put(pid_string, true)
+
+        message
+        |> Broadway.Message.update_data(fn _ -> "bar" end)
+        |> Broadway.Message.failed("test failure")
+      end
+    end
+
+    def handle_batch(_, messages, _, %{test_pid: test_pid}) do
+      send(test_pid, {:handle_batch, Enum.map(messages, & &1.data)})
+      messages
+    end
+  end
+
   describe "init/1 validation" do
     test "requires a buffer" do
       {:error, error} =
@@ -156,23 +196,32 @@ defmodule OffBroadwayMemory.ProducerTest do
     stop_broadway(broadway_pid)
   end
 
-  defmodule Forwarder do
-    @moduledoc false
-    use Broadway
+  test "requeues messages with their original data" do
+    Buffer.start_link(name: :test_buffer)
+    broadway_opts = [buffer: :test_buffer, resolve_pending_timeout: 25, on_failure: :requeue]
+    {:ok, broadway_pid} = start_broadway(broadway_opts, BuggyForwarder)
 
-    def handle_message(_, message, %{test_pid: test_pid}) do
-      send(test_pid, {:handle_message, message.data})
-      message
-    end
+    deliver_messages(:test_buffer, ["foo"])
 
-    def handle_batch(_, messages, _, %{test_pid: test_pid}) do
-      send(test_pid, {:handle_batch, Enum.map(messages, & &1.data)})
-      messages
-    end
+    assert_receive {:handle_message, "foo"}
+
+    stop_broadway(broadway_pid)
   end
 
-  defp start_broadway(opts) do
-    Broadway.start_link(Forwarder,
+  test "discards failed messages" do
+    Buffer.start_link(name: :test_buffer)
+    broadway_opts = [buffer: :test_buffer, resolve_pending_timeout: 25, on_failure: :discard]
+    {:ok, broadway_pid} = start_broadway(broadway_opts, BuggyForwarder)
+
+    deliver_messages(:test_buffer, ["foo"])
+
+    refute_receive {:handle_message, _}
+
+    stop_broadway(broadway_pid)
+  end
+
+  defp start_broadway(opts, module \\ Forwarder) do
+    Broadway.start_link(module,
       name: new_unique_name(),
       context: %{test_pid: self()},
       producer: [
