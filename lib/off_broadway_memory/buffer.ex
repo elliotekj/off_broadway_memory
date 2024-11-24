@@ -26,6 +26,14 @@ defmodule OffBroadwayMemory.Buffer do
   end
 
   @doc """
+  Push messages to the buffer asynchronously.
+  """
+  @spec async_push(GenServer.server(), list(any()) | any()) :: :ok
+  def async_push(server, messages) do
+    GenServer.cast(server, {:push, messages})
+  end
+
+  @doc """
   Pop messages from the buffer.
   """
   @spec pop(GenServer.server(), non_neg_integer()) :: list(any())
@@ -51,12 +59,9 @@ defmodule OffBroadwayMemory.Buffer do
 
   @impl true
   def handle_call({:push, messages}, _from, state) when is_list(messages) do
-    messages_length = Kernel.length(messages)
+    state = push_to_state(state, messages)
 
-    join = :queue.from_list(messages)
-    updated_queue = :queue.join(state.queue, join)
-
-    {:reply, :ok, %{queue: updated_queue, length: state.length + messages_length}}
+    {:reply, :ok, state}
   end
 
   def handle_call({:push, message}, _from, state) do
@@ -90,5 +95,27 @@ defmodule OffBroadwayMemory.Buffer do
 
   def handle_call(:length, _from, %{length: length} = state) do
     {:reply, length, state}
+  end
+
+  @impl true
+  def handle_cast({:push, messages}, state) when is_list(messages) do
+    state = push_to_state(state, messages)
+
+    {:noreply, state}
+  end
+
+  def handle_cast({:push, message}, state) do
+    updated_queue = :queue.in(message, state.queue)
+
+    {:noreply, %{queue: updated_queue, length: state.length + 1}}
+  end
+
+  defp push_to_state(state, messages) do
+    messages_length = Kernel.length(messages)
+
+    join = :queue.from_list(messages)
+    updated_queue = :queue.join(state.queue, join)
+
+    %{queue: updated_queue, length: state.length + messages_length}
   end
 end

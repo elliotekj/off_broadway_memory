@@ -26,6 +26,16 @@ defmodule OffBroadwayMemory.BufferTest do
     end
   end
 
+  describe "async_push/2" do
+    test "pushes a message", %{buffer_pid: buffer_pid} do
+      assert :ok == Buffer.async_push(buffer_pid, "test")
+    end
+
+    test "pushes a list of messages", %{buffer_pid: buffer_pid} do
+      assert :ok == Buffer.async_push(buffer_pid, ["test 1", "test 2"])
+    end
+  end
+
   describe "pop/2" do
     test "pops 1 message by default", %{buffer_pid: buffer_pid} do
       Buffer.push(buffer_pid, ["test 1", "test 2"])
