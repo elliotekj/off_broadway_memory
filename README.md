@@ -15,15 +15,9 @@ def deps do
 end
 ```
 
-## Usage ([full documentation](https://hexdocs.pm/off_broadway_memory))
+## Basic Usage ([full documentation](https://hexdocs.pm/off_broadway_memory))
 
-Start a buffer:
-
-```elixir
-OffBroadwayMemory.Buffer.start_link(name: :example_buffer)
-```
-
-Connect it to Broadway:
+Start Broadway:
 
 ```elixir
 Broadway.start_link(MyBroadway,
@@ -44,8 +38,7 @@ OffBroadwayMemory.Buffer.push(:example_buffer, ["example", "data", "set"])
 
 ## License
 
-`OffBroadwayMemory` is released under the [`Apache License
-2.0`](https://github.com/elliotekj/off_broadway_memory/blob/main/LICENSE).
+`OffBroadwayMemory` is released under the [`Apache License 2.0`](https://github.com/elliotekj/off_broadway_memory/blob/main/LICENSE).
 
 ## About
 

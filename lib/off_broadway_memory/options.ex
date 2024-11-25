@@ -7,7 +7,9 @@ defmodule OffBroadwayMemory.Options do
         # TODO Require this once we drop support for `:buffer_pid`
         type: {:or, [:pid, :atom]},
         doc: """
-        The buffer responsible for storing the queued messages.
+        The buffer responsible for storing the queued messages. The buffer can
+        be supervised independently or by Broadway's supervision tree. To
+        supervise the buffer independently, start it before starting Broadway.
         """
       ],
       resolve_pending_timeout: [

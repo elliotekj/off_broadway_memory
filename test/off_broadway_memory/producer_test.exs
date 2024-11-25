@@ -72,8 +72,20 @@ defmodule OffBroadwayMemory.ProducerTest do
     stop_broadway(broadway_pid)
   end
 
-  test "receives messages from a named buffer" do
+  test "receives messages from an externally supervised buffer" do
     Buffer.start_link(name: :test_buffer)
+    {:ok, broadway_pid} = start_broadway(buffer: :test_buffer, resolve_pending_timeout: 50)
+
+    deliver_messages(:test_buffer, 1..2)
+
+    assert_receive {:handle_message, 1}
+    assert_receive {:handle_message, 2}
+    assert_receive {:handle_batch, [1, 2]}
+
+    stop_broadway(broadway_pid)
+  end
+
+  test "receives messages from an internally supervised buffer" do
     {:ok, broadway_pid} = start_broadway(buffer: :test_buffer, resolve_pending_timeout: 50)
 
     deliver_messages(:test_buffer, 1..2)
