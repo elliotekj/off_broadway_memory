@@ -6,10 +6,27 @@ defmodule OffBroadwayMemory.Producer do
 
   #{NimbleOptions.docs(OffBroadwayMemory.Options.definition())}
 
-  ## Example
+  ## Basic Usage
 
   ```
-  # Start a buffer:
+  # Start Broadway:
+  Broadway.start_link(MyBroadway,
+    name: MyBroadway,
+    producer: [
+      module: {OffBroadwayMemory.Producer, buffer: :example_buffer},
+      concurrency: 1
+    ],
+    processors: [default: [concurrency: 50]]
+  )
+
+  # Push data to be processed:
+  OffBroadwayMemory.Buffer.push(:example_buffer, ["example", "data", "set"])
+  ```
+
+  ## Advanced Usage
+
+  ```
+  # Start the buffer:
   OffBroadwayMemory.Buffer.start_link(name: :example_buffer)
 
   # Connect it to Broadway:
@@ -121,6 +138,16 @@ defmodule OffBroadwayMemory.Producer do
     end
   end
 
+  @impl Broadway.Producer
+  def prepare_for_start(_module, opts) do
+    with buffer when not is_nil(buffer) <- get_buffer(opts),
+         false <- buffer_exists?(buffer) do
+      {[{OffBroadwayMemory.Buffer, [name: buffer]}], opts}
+    else
+      _ -> {[], opts}
+    end
+  end
+
   @impl Broadway.Acknowledger
   def ack(ack_ref, _successful, failed) do
     ack_options = :persistent_term.get(ack_ref)
@@ -153,6 +180,20 @@ defmodule OffBroadwayMemory.Producer do
     Process.send_after(self(), :resolve_pending, state.resolve_pending_timeout)
     {:noreply, items, state}
   end
+
+  defp get_buffer(opts) do
+    with {:ok, producer} <- Keyword.fetch(opts, :producer),
+         {:ok, module} <- Keyword.fetch(producer, :module),
+         {_module, module_opts} <- module,
+         {:ok, buffer} <- Keyword.fetch(module_opts, :buffer) do
+      buffer
+    else
+      _ -> nil
+    end
+  end
+
+  defp buffer_exists?(buffer) when is_pid(buffer), do: true
+  defp buffer_exists?(buffer), do: Process.whereis(buffer) != nil
 
   defp resolve_demand(new_demand \\ 0, %{demand: pending_demand} = state) do
     demand = new_demand + pending_demand
