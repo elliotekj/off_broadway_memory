@@ -24,7 +24,7 @@ defmodule OffBroadwayMemory.Options do
       on_failure: [
         required: false,
         default: :requeue,
-        type: :atom,
+        type: {:in, [:requeue, :discard]},
         doc: """
         The action to perform on failed messages. Options are `:requeue` and
         `:discard`. This can also be configured on a per-message basis with
